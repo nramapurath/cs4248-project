@@ -1,4 +1,3 @@
-
 # Import libraries
 from transformers import BertTokenizerFast, BertForQuestionAnswering, Trainer, TrainingArguments
 from datasets import Dataset
@@ -52,27 +51,37 @@ def preprocess(example):
     offset_mapping = inputs.pop("offset_mapping")
     start_positions = []
     end_positions = []
-    
+
     # Process single answer start and text
     start_char = example["answers"]["answer_start"]
     end_char = start_char + len(example["answers"]["text"])
-    
-    # Find token positions for the answer span
+
+    # Find the token positions for the answer span
     token_start_index = 0
     token_end_index = len(offset_mapping) - 1
 
-    while token_start_index < len(offset_mapping) and offset_mapping[token_start_index][0] <= start_char:
-        token_start_index += 1
-    while token_end_index >= 0 and offset_mapping[token_end_index][1] >= end_char:
-        token_end_index -= 1
+    # Identify the start token index
+    for i, (start, end) in enumerate(offset_mapping):
+        if start <= start_char < end:
+            token_start_index = i
+            break
 
-    start_positions.append(token_start_index - 1)
-    end_positions.append(token_end_index + 1)
+    # Identify the end token index
+    for i, (start, end) in enumerate(offset_mapping):
+        if start < end_char <= end:
+            token_end_index = i
+            break
+
+    # Check if positions are valid
+    if token_start_index > token_end_index:
+        token_start_index, token_end_index = 0, 0  # default to CLS token position
+
+    start_positions.append(token_start_index)
+    end_positions.append(token_end_index)
 
     inputs["start_positions"] = torch.tensor(start_positions)
     inputs["end_positions"] = torch.tensor(end_positions)
     return inputs
-
 
 # Apply preprocessing to the datasets
 train_dataset = train_dataset.map(preprocess, remove_columns=["context", "question", "answers"])
