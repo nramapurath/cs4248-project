@@ -1,14 +1,20 @@
 # Import libraries
-from transformers import BertTokenizerFast, BertForQuestionAnswering, Trainer, TrainingArguments
+from transformers import (
+    BertTokenizerFast,
+    BertForQuestionAnswering,
+    Trainer,
+    TrainingArguments,
+)
 from datasets import Dataset
 import json
 import torch
+
 
 # Load JSON data
 def load_squad_data(file_path):
     with open(file_path, "r") as file:
         squad_data = json.load(file)["data"]
-        
+
     contexts = []
     questions = []
     answers = []
@@ -24,6 +30,7 @@ def load_squad_data(file_path):
                     answers.append(answer)
     return {"context": contexts, "question": questions, "answers": answers}
 
+
 # Load your training and validation data
 train_data = load_squad_data("train-v1.1.json")
 val_data = load_squad_data("dev-v1.1.json")
@@ -37,6 +44,7 @@ model_name = "bert-base-uncased"
 tokenizer = BertTokenizerFast.from_pretrained(model_name)
 model = BertForQuestionAnswering.from_pretrained(model_name)
 
+
 # Preprocess data
 def preprocess(example):
     inputs = tokenizer(
@@ -45,9 +53,9 @@ def preprocess(example):
         max_length=384,
         truncation="only_second",
         padding="max_length",
-        return_offsets_mapping=True
+        return_offsets_mapping=True,
     )
-    
+
     offset_mapping = inputs.pop("offset_mapping")
     start_positions = []
     end_positions = []
@@ -83,9 +91,14 @@ def preprocess(example):
     inputs["end_positions"] = torch.tensor(end_positions)
     return inputs
 
+
 # Apply preprocessing to the datasets
-train_dataset = train_dataset.map(preprocess, remove_columns=["context", "question", "answers"])
-val_dataset = val_dataset.map(preprocess, remove_columns=["context", "question", "answers"])
+train_dataset = train_dataset.map(
+    preprocess, remove_columns=["context", "question", "answers"]
+)
+val_dataset = val_dataset.map(
+    preprocess, remove_columns=["context", "question", "answers"]
+)
 
 # Set up the Trainer
 training_args = TrainingArguments(
