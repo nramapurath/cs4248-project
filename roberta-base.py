@@ -1,8 +1,8 @@
-# Import libraries
 from transformers import BertTokenizerFast, BertForQuestionAnswering, Trainer, TrainingArguments
 from datasets import Dataset
 import json
 import torch
+import optuna
 
 # Load JSON data
 def load_squad_data(file_path):
@@ -24,11 +24,9 @@ def load_squad_data(file_path):
                     answers.append(answer)
     return {"context": contexts, "question": questions, "answers": answers}
 
-# Load your training and validation data
-train_data = load_squad_data("train-v1.1.json")
+# Convert data to Hugging Face Dataset format
+train_data = load_squad_data("train-v1.1-liter.json")
 val_data = load_squad_data("dev-v1.1.json")
-
-# Convert to Hugging Face dataset format
 train_dataset = Dataset.from_dict(train_data)
 val_dataset = Dataset.from_dict(val_data)
 
@@ -49,65 +47,78 @@ def preprocess(example):
     )
     
     offset_mapping = inputs.pop("offset_mapping")
-    start_positions = []
-    end_positions = []
-
-    # Process single answer start and text
     start_char = example["answers"]["answer_start"]
     end_char = start_char + len(example["answers"]["text"])
-
-    # Find the token positions for the answer span
     token_start_index = 0
     token_end_index = len(offset_mapping) - 1
 
-    # Identify the start token index
     for i, (start, end) in enumerate(offset_mapping):
         if start <= start_char < end:
             token_start_index = i
             break
 
-    # Identify the end token index
     for i, (start, end) in enumerate(offset_mapping):
         if start < end_char <= end:
             token_end_index = i
             break
 
-    # Check if positions are valid
     if token_start_index > token_end_index:
-        token_start_index, token_end_index = 0, 0  # default to CLS token position
+        token_start_index, token_end_index = 0, 0
 
-    start_positions.append(token_start_index)
-    end_positions.append(token_end_index)
-
-    inputs["start_positions"] = torch.tensor(start_positions)
-    inputs["end_positions"] = torch.tensor(end_positions)
+    inputs["start_positions"] = torch.tensor([token_start_index])
+    inputs["end_positions"] = torch.tensor([token_end_index])
     return inputs
 
-# Apply preprocessing to the datasets
+# Apply preprocessing directly to datasets
 train_dataset = train_dataset.map(preprocess, remove_columns=["context", "question", "answers"])
 val_dataset = val_dataset.map(preprocess, remove_columns=["context", "question", "answers"])
 
-# Set up the Trainer
-training_args = TrainingArguments(
-    output_dir="./results",
-    evaluation_strategy="epoch",
-    learning_rate=3e-5,
-    per_device_train_batch_size=8,
-    per_device_eval_batch_size=8,
-    num_train_epochs=2,
-    weight_decay=0.01,
-)
+# Hyperparameter tuning function using Optuna
+def model_training(trial):
+    learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 5e-5)
+    batch_size = trial.suggest_categorical("batch_size", [16, 32])
+    num_train_epochs = trial.suggest_int("num_train_epochs", 2, 4)
 
-trainer = Trainer(
-    model=model,
-    args=training_args,
-    train_dataset=train_dataset,
-    eval_dataset=val_dataset,
-)
+    training_args = TrainingArguments(
+        output_dir="./results",
+        evaluation_strategy="epoch",
+        learning_rate=learning_rate,
+        per_device_train_batch_size=batch_size,
+        per_device_eval_batch_size=batch_size,
+        num_train_epochs=num_train_epochs,
+        weight_decay=0.01,
+        save_total_limit=1,
+        save_strategy="epoch",
+        dataloader_num_workers=4,
+        fp16=True,
+        gradient_accumulation_steps=4,
+        gradient_checkpointing=True,
+        remove_unused_columns=False,
+    )
 
-# Train the model
-trainer.train()
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_dataset,
+        eval_dataset=val_dataset,
+    )
 
-# Evaluate the model
-results = trainer.evaluate()
-print("Evaluation results:", results)
+    trainer.train()
+    eval_results = trainer.evaluate()
+    
+    return eval_results["eval_loss"]
+
+# Run hyperparameter optimization
+study = optuna.create_study(direction="minimize")
+study.optimize(model_training, n_trials=3)
+
+# Best hyperparameters
+print("Best hyperparameters found:", study.best_params)
+
+# Save the best model and tokenizer
+model.save_pretrained("best_model")
+tokenizer.save_pretrained("best_tokenizer")
+
+# Load and apply the model later
+model = BertForQuestionAnswering.from_pretrained("best_model")
+tokenizer = BertTokenizerFast.from_pretrained("best_tokenizer")
