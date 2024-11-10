@@ -1,4 +1,4 @@
-from transformers import BertTokenizerFast, BertForQuestionAnswering, Trainer, TrainingArguments
+from transformers import AutoTokenizer, RobertaForQuestionAnswering, Trainer, TrainingArguments
 from datasets import Dataset
 import json
 import torch
@@ -31,9 +31,9 @@ train_dataset = Dataset.from_dict(train_data)
 val_dataset = Dataset.from_dict(val_data)
 
 # Load BERT tokenizer and model
-model_name = "bert-base-uncased"
-tokenizer = BertTokenizerFast.from_pretrained(model_name)
-model = BertForQuestionAnswering.from_pretrained(model_name)
+model_name = "deepset/roberta-large-squad2"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = RobertaForQuestionAnswering.from_pretrained(model_name)
 
 # Preprocess data
 def preprocess(example):
@@ -120,5 +120,5 @@ model.save_pretrained("best_model")
 tokenizer.save_pretrained("best_tokenizer")
 
 # Load and apply the model later
-model = BertForQuestionAnswering.from_pretrained("best_model")
-tokenizer = BertTokenizerFast.from_pretrained("best_tokenizer")
+model = RobertaForQuestionAnswering.from_pretrained("best_model")
+tokenizer = AutoTokenizer.from_pretrained("best_tokenizer")
