@@ -107,7 +107,7 @@ if __name__ == "__main__":
     # Hyperparameter tuning function using Optuna
     def model_training(trial: optuna.Trial):
         learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-5, log=True)
-        batch_size = trial.suggest_categorical("batch_size", [2, 4])
+        batch_size = trial.suggest_categorical("batch_size", [8, 16])
         num_train_epochs = trial.suggest_int("num_train_epochs", 2, 4)
 
         training_args = TrainingArguments(
