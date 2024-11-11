@@ -25,7 +25,7 @@ def load_squad_data(file_path):
     return {"context": contexts, "question": questions, "answers": answers}
 
 # Convert data to Hugging Face Dataset format
-train_data = load_squad_data("train-v1.1-liter.json")
+train_data = load_squad_data("train-v1.1.json")
 val_data = load_squad_data("dev-v1.1.json")
 train_dataset = Dataset.from_dict(train_data)
 val_dataset = Dataset.from_dict(val_data)
