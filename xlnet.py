@@ -14,7 +14,7 @@ import dotenv
 dotenv.load_dotenv()
 MODEL_NAME = "xlnet/xlnet-base-cased"
 TOKENIZER_NAME = "xlnet/xlnet-base-cased"
-TRAIN_DATASET_NAME = "train-v1.1-liter.json"
+TRAIN_DATASET_NAME = "train-v1.1.json"
 VAL_DATASET_NAME = "dev-v1.1.json"
 OUTPUT_MODEL_NAME = "best_xlnet_model"
 OUTPUT_TOKENIZER_NAME = "best_xlnet_tokenizer"
