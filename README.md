@@ -41,7 +41,7 @@ This project demonstrates how to fine-tune a BERT model on the SQuAD dataset for
     ```
 3. Finally run the following command to get the evaluation metrics.
     ```bash
-    python evaluate-v2.0.py dev-v1.1.json predictions.json -o eval_results.json -v
+    python evaluate-v2.0.py dev-v1.1.json bertfinetuned-predictions.json -o eval_results.json -v
     ```
 
 ## Data Preparation with `base-bert.py`

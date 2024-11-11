@@ -32,12 +32,19 @@ qa_pipeline = pipeline("question-answering", model=model, tokenizer=tokenizer)
 
 # Apply the model on the dev dataset and store predictions
 predictions = {}
-for context, question, qid in zip(val_data["context"], val_data["question"], val_data["id"]):
-    answer = qa_pipeline({"question": question, "context": context})
-    predictions[qid] = answer["answer"]  # Store the answer using question ID as key
+predictions_full = {}
+for idx, (context, question, qid) in enumerate(zip(val_data["context"], val_data["question"], val_data["id"])):
+    answers = qa_pipeline({"question": question, "context": context}, top_k=3)
+    predictions[qid] = answers[0]["answer"]  # Store the answer using question ID as key
+    predictions_full[qid] = answers
+
+    if idx % 50 == 0:
+        print(f"{idx} predicted")
 
 # Save predictions to a JSON file in the required format
-with open("predictions.json", "w") as outfile:
+with open("bertfinetuned-predictions.json", "w") as outfile:
     json.dump(predictions, outfile, indent=4)
 
-print("Predictions saved to predictions.json")
+with open("bertfinetuned-predictions_full.json", "w") as outfile:
+    json.dump(predictions_full, outfile, indent=4)
+print("Predictions saved to predictions.json and predictions_full.json")
