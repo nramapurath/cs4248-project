@@ -8,11 +8,11 @@ This project demonstrates how to fine-tune a BERT model on the SQuAD dataset for
 ## Table of Contents
 
 - [Setup](#setup)
-- [Running the code](#Running the code)
-- [Data Preparation with `base-bert.py`](#data-preparation-with-base-bert.py)
-- [Training and Hyperparameter Tuning with `base-bert.py`](#training-and-hyperparameter-tuning-with-base-bert.py)
-- [Evaluating the Model with `evalprep.py`](#evaluating-the-model-with-evalprep.py)
-- [Generating Predictions with `evalprep.py`](#generating-predictions-with-evalprep.py)
+- [Running the code](#Running-the-code)
+- [Data Preparation with `base-bert.py`](#data-preparation-with-base-bertpy)
+- [Training and Hyperparameter Tuning with `base-bert.py`](#training-and-hyperparameter-tuning-with-base-bertpy)
+- [Evaluating the Model with `evalprep.py`](#evaluating-the-model-with-evalpreppy)
+- [Generating Predictions with `evalprep.py`](#generating-predictions-with-evalpreppy)
 - [Saving and Loading the Model](#saving-and-loading-the-model)
 
 ## Setup
