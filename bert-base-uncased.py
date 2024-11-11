@@ -135,5 +135,5 @@ model.save_pretrained("best_model")
 tokenizer.save_pretrained("best_tokenizer")
 
 # Load and apply the model later
-model = RobertaForQuestionAnswering.from_pretrained("best_model")
-tokenizer = AutoTokenizer.from_pretrained("best_tokenizer")
+model = BertForQuestionAnswering.from_pretrained("best_model")
+tokenizer = BertTokenizerFast.from_pretrained("best_tokenizer")
