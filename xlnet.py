@@ -18,7 +18,7 @@ TRAIN_DATASET_NAME = "train-v1.1.json"
 VAL_DATASET_NAME = "dev-v1.1.json"
 OUTPUT_MODEL_NAME = "best_xlnet_model"
 OUTPUT_TOKENIZER_NAME = "best_xlnet_tokenizer"
-DEVICE = "cpu"
+DEVICE = "mps"  # "cuda" if GPU available, "mps" if Mac, "cpu" otherwise
 
 
 # Load SQuAD data as JSON
@@ -67,7 +67,7 @@ if __name__ == "__main__":
         inputs = tokenizer(
             example["question"],
             example["context"],
-            max_length=512, # Max BERT input length
+            max_length=512,  # Max BERT input length
             truncation="only_second",
             padding="max_length",
             return_offsets_mapping=True,
@@ -107,7 +107,9 @@ if __name__ == "__main__":
     # Hyperparameter tuning function using Optuna
     def model_training(trial: optuna.Trial):
         learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-5, log=True)
-        batch_size = trial.suggest_categorical("batch_size", [8, 16]) # [16, 32] if larger RAM
+        batch_size = trial.suggest_categorical(
+            "batch_size", [2, 4]
+        )  # [16, 32] if larger RAM
         num_train_epochs = trial.suggest_int("num_train_epochs", 2, 4)
 
         training_args = TrainingArguments(
@@ -121,7 +123,7 @@ if __name__ == "__main__":
             save_total_limit=1,
             save_strategy="epoch",
             dataloader_num_workers=4,
-            fp16=False, # True if CUDA
+            fp16=False,  # True if CUDA
             gradient_accumulation_steps=4,
             gradient_checkpointing=False,  # XLNet does not support gradient checkpointing
             remove_unused_columns=False,
@@ -138,6 +140,12 @@ if __name__ == "__main__":
         eval_results = trainer.evaluate()
 
         return eval_results["eval_loss"]
+
+    # Clear MPS cache
+    if DEVICE == "mps":
+        torch.mps.empty_cache()
+    elif DEVICE == "cuda":
+        torch.cuda.empty_cache()
 
     # Run hyperparameter optimization
     study = optuna.create_study(direction="minimize")
