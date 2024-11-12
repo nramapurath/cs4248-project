@@ -103,8 +103,8 @@ if __name__ == '__main__':
     os.environ["TOKENIZERS_PARALLELISM"] = "false" #added to not cause deadlocks
 
     # Convert data to Hugging Face Dataset format
-    train_data = load_squad_data("train-v1.1.json")
-    val_data = load_squad_data("dev-v1.1.json")
+    train_data = load_squad_data("../data/train-v1.1.json")
+    val_data = load_squad_data("../data/dev-v1.1.json")
     train_dataset = Dataset.from_dict(train_data)
     val_dataset = Dataset.from_dict(val_data)
 

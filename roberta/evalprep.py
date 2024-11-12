@@ -26,7 +26,7 @@ def load_squad_data(file_path):
     return {"context": contexts, "question": questions, "id": question_ids}
 
 # Prepare the validation data
-val_data = load_squad_data("dev-v1.1.json")
+val_data = load_squad_data("../data/dev-v1.1.json")
 
 # Prepare the pipeline for question answering
 qa_pipeline = pipeline("question-answering", model=model, tokenizer=tokenizer, device=0)
