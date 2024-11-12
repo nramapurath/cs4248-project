@@ -3,8 +3,8 @@ import json
 import torch
 
 # Load the best trained model and tokenizer
-model = RobertaForQuestionAnswering.from_pretrained("deepset/roberta-base-squad2")
-tokenizer = AutoTokenizer.from_pretrained("deepset/roberta-base-squad2")
+model = RobertaForQuestionAnswering.from_pretrained("best_roberta_model")
+tokenizer = AutoTokenizer.from_pretrained("best_roberta_tokenizer")
 
 # Load JSON data
 def load_squad_data(file_path):
@@ -46,6 +46,6 @@ for idx, (context, question, qid) in enumerate(zip(val_data["context"], val_data
 with open("predictions.json", "w") as outfile:
     json.dump(predictions, outfile, indent=4)
 
-with open("predictions_full.json", "w") as outfile:
+with open("roberta_predictions_full.json", "w") as outfile:
     json.dump(predictions_full, outfile, indent=4)
-print("Predictions saved to predictions.json and predictions_full.json")
+print("Predictions saved to roberta_predictions_full.json")

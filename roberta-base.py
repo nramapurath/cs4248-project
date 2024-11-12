@@ -3,6 +3,8 @@ from datasets import Dataset
 import json
 import torch
 import optuna
+import os
+
 
 # Load JSON data
 def load_squad_data(file_path):
@@ -24,16 +26,7 @@ def load_squad_data(file_path):
                     answers.append(answer)
     return {"context": contexts, "question": questions, "answers": answers}
 
-# Convert data to Hugging Face Dataset format
-train_data = load_squad_data("train-v1.1-liter.json")
-val_data = load_squad_data("dev-v1.1.json")
-train_dataset = Dataset.from_dict(train_data)
-val_dataset = Dataset.from_dict(val_data)
 
-# Load BERT tokenizer and model
-model_name = "deepset/roberta-large-squad2"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = RobertaForQuestionAnswering.from_pretrained(model_name)
 
 # Preprocess data
 def preprocess(example):
@@ -41,7 +34,7 @@ def preprocess(example):
         example["question"],
         example["context"],
         max_length=384,
-        truncation="only_second",
+        truncation="only_second" if len(example["context"]) > 384 else False,
         padding="max_length",
         return_offsets_mapping=True
     )
@@ -69,9 +62,6 @@ def preprocess(example):
     inputs["end_positions"] = torch.tensor([token_end_index])
     return inputs
 
-# Apply preprocessing directly to datasets
-train_dataset = train_dataset.map(preprocess, remove_columns=["context", "question", "answers"])
-val_dataset = val_dataset.map(preprocess, remove_columns=["context", "question", "answers"])
 
 # Hyperparameter tuning function using Optuna
 def model_training(trial):
@@ -81,7 +71,7 @@ def model_training(trial):
 
     training_args = TrainingArguments(
         output_dir="./results",
-        evaluation_strategy="epoch",
+        eval_strategy="epoch",
         learning_rate=learning_rate,
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size,
@@ -90,7 +80,7 @@ def model_training(trial):
         save_total_limit=1,
         save_strategy="epoch",
         dataloader_num_workers=4,
-        fp16=True,
+        fp16=False, #disabled as it causes error on my machine, it was set to true originally.
         gradient_accumulation_steps=4,
         gradient_checkpointing=True,
         remove_unused_columns=False,
@@ -108,17 +98,36 @@ def model_training(trial):
     
     return eval_results["eval_loss"]
 
-# Run hyperparameter optimization
-study = optuna.create_study(direction="minimize")
-study.optimize(model_training, n_trials=3)
 
-# Best hyperparameters
-print("Best hyperparameters found:", study.best_params)
+if __name__ == '__main__':
+    os.environ["TOKENIZERS_PARALLELISM"] = "false" #added to not cause deadlocks
 
-# Save the best model and tokenizer
-model.save_pretrained("best_model")
-tokenizer.save_pretrained("best_tokenizer")
+    # Convert data to Hugging Face Dataset format
+    train_data = load_squad_data("train-v1.1.json")
+    val_data = load_squad_data("dev-v1.1.json")
+    train_dataset = Dataset.from_dict(train_data)
+    val_dataset = Dataset.from_dict(val_data)
 
-# Load and apply the model later
-model = RobertaForQuestionAnswering.from_pretrained("best_model")
-tokenizer = AutoTokenizer.from_pretrained("best_tokenizer")
+    # Load BERT tokenizer and model
+    model_name = "FacebookAI/roberta-base"
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = RobertaForQuestionAnswering.from_pretrained(model_name)
+
+    # Apply preprocessing directly to datasets
+    train_dataset = train_dataset.map(preprocess, remove_columns=["context", "question", "answers"])
+    val_dataset = val_dataset.map(preprocess, remove_columns=["context", "question", "answers"])
+
+    # Run hyperparameter optimization
+    study = optuna.create_study(direction="minimize")
+    study.optimize(model_training, n_trials=3)
+
+    # Best hyperparameters
+    print("Best hyperparameters found:", study.best_params)
+
+    # Save the best model and tokenizer
+    model.save_pretrained("best_roberta_model")
+    tokenizer.save_pretrained("best_roberta_tokenizer")
+
+    # Load and apply the model later
+    model = RobertaForQuestionAnswering.from_pretrained("best_roberta_model")
+    tokenizer = AutoTokenizer.from_pretrained("best_roberta_tokenizer")
