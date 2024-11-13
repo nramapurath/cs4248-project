@@ -1,8 +1,8 @@
 
-# BERT Question Answering Model Training and Evaluation
+# SQuAD v2.0 Question Answering Model Training and Evaluation
 
-This project demonstrates how to fine-tune a BERT model on the SQuAD dataset for question answering tasks. It includes two main scripts:
-- `base-bert.py`: Prepares the dataset, performs hyperparameter tuning, and trains the BERT model using Hugging Face's `Trainer` API.
+This project demonstrates how to fine-tune a BERT/XLNET models on the SQuAD dataset for question answering tasks. It includes two main scripts:
+- `ensemble.py`: Prepares the dataset, performs hyperparameter tuning, and trains the BERT model using Hugging Face's `Trainer` API.
 - `evalprep.py`: Loads the trained model and tokenizer for evaluating and generating predictions on new data.
 
 ## Table of Contents
@@ -27,7 +27,7 @@ This project demonstrates how to fine-tune a BERT model on the SQuAD dataset for
 2. Install the required dependencies:
 
     ```bash
-    pip install torch transformers datasets optuna
+    pip install -r requirements.txt
     ```
 ## Running the code
 1. Run the following command in the present working directory to train base bert on train data set.
