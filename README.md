@@ -14,7 +14,7 @@ Each directory contains the following files:
 
 ## Models Used
 
-| Model | Size (# Params) | F1 Score | EM Score |
+| Model Finetuned | Size (# Params) | F1 Score | EM Score |
 | --- | --- | --- | --- |
 | Base BERT | 110M | 86.02 | 77.48 |
 | RoBERTa | 125M | 86.59 | **78.54** |
