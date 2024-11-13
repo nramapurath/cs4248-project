@@ -3,8 +3,8 @@ import json
 
 # Load the tokenizers and models
 bert_model_name = "google-bert/bert-large-uncased-whole-word-masking-finetuned-squad"
-bert_finetuned_model_name = "bert/best_bertfinetuned_model"
-bert_finetuned_tokenizer_name = "bert/best_bertfinetuned_tokenizer"
+bert_finetuned_model_name = "bert/bertfinetuned_model_tokenizer/best_bertfinetuned_model"
+bert_finetuned_tokenizer_name = "bert/bertfinetuned_model_tokenizer/best_best_bertfinetuned_tokenizer"
 roberta_model_name = "roberta/best_roberta_model"
 roberta_tokenizer_name = "roberta/best_roberta_tokenizer"
 xlnet_model_name = "xlnet/best_xlnet_model"
