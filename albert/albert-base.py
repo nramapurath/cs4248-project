@@ -159,7 +159,3 @@ if __name__ == "__main__":
     # Save the best model and tokenizer
     model.save_pretrained(OUTPUT_MODEL_NAME)
     tokenizer.save_pretrained(OUTPUT_TOKENIZER_NAME)
-
-    # # Load and apply the model later
-    # model = XLNetForQuestionAnswering.from_pretrained("best_xlnet_model")
-    # tokenizer = XLNetTokenizerFast.from_pretrained("best_xlnet_tokenizer")
