@@ -20,6 +20,7 @@ Each directory contains the following files:
 | RoBERTa | 125M | 86.59 | **78.54** |
 | XLNet | 110M | 78.98 | 69.12 |
 | ALBERT | **223M** | **87.77** | 77.96 |
+| DistilBERT | 66M | - | - |
 
 
 ## Table of Contents
