@@ -1,4 +1,9 @@
-from transformers import AutoTokenizer, RobertaForQuestionAnswering, Trainer, TrainingArguments
+from transformers import (
+    AutoTokenizer,
+    RobertaForQuestionAnswering,
+    Trainer,
+    TrainingArguments,
+)
 from datasets import Dataset
 import json
 import torch
@@ -10,7 +15,7 @@ import os
 def load_squad_data(file_path):
     with open(file_path, "r") as file:
         squad_data = json.load(file)["data"]
-        
+
     contexts = []
     questions = []
     answers = []
@@ -27,7 +32,6 @@ def load_squad_data(file_path):
     return {"context": contexts, "question": questions, "answers": answers}
 
 
-
 # Preprocess data
 def preprocess(example):
     inputs = tokenizer(
@@ -36,9 +40,9 @@ def preprocess(example):
         max_length=384,
         truncation="only_second" if len(example["context"]) > 384 else False,
         padding="max_length",
-        return_offsets_mapping=True
+        return_offsets_mapping=True,
     )
-    
+
     offset_mapping = inputs.pop("offset_mapping")
     start_char = example["answers"]["answer_start"]
     end_char = start_char + len(example["answers"]["text"])
@@ -80,7 +84,7 @@ def model_training(trial):
         save_total_limit=1,
         save_strategy="epoch",
         dataloader_num_workers=4,
-        fp16=False, #disabled as it causes error on my machine, it was set to true originally.
+        fp16=False,  # disabled as it causes error on my machine, it was set to true originally.
         gradient_accumulation_steps=4,
         gradient_checkpointing=True,
         remove_unused_columns=False,
@@ -95,12 +99,12 @@ def model_training(trial):
 
     trainer.train()
     eval_results = trainer.evaluate()
-    
+
     return eval_results["eval_loss"]
 
 
-if __name__ == '__main__':
-    os.environ["TOKENIZERS_PARALLELISM"] = "false" #added to not cause deadlocks
+if __name__ == "__main__":
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"  # added to not cause deadlocks
 
     # Convert data to Hugging Face Dataset format
     train_data = load_squad_data("../data/train-v1.1.json")
@@ -114,8 +118,12 @@ if __name__ == '__main__':
     model = RobertaForQuestionAnswering.from_pretrained(model_name)
 
     # Apply preprocessing directly to datasets
-    train_dataset = train_dataset.map(preprocess, remove_columns=["context", "question", "answers"])
-    val_dataset = val_dataset.map(preprocess, remove_columns=["context", "question", "answers"])
+    train_dataset = train_dataset.map(
+        preprocess, remove_columns=["context", "question", "answers"]
+    )
+    val_dataset = val_dataset.map(
+        preprocess, remove_columns=["context", "question", "answers"]
+    )
 
     # Run hyperparameter optimization
     study = optuna.create_study(direction="minimize")
