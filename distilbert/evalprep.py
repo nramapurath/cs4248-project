@@ -1,13 +1,17 @@
-from transformers import XLNetTokenizerFast, XLNetForQuestionAnswering, pipeline
+from transformers import (
+    DistilBertTokenizerFast,
+    DistilBertForQuestionAnswering,
+    pipeline,
+)
 import json
 
-MODEL_NAME = "best_xlnet_model"
-TOKENIZER_NAME = "best_xlnet_tokenizer"
+MODEL_NAME = "best_distilbert_model"
+TOKENIZER_NAME = "best_distilbert_tokenizer"
 DATASET_NAME = "dev-v1.1.json"
 
 # Load the best trained model and tokenizer from disk (run this after training)
-model = XLNetForQuestionAnswering.from_pretrained(MODEL_NAME)
-tokenizer = XLNetTokenizerFast.from_pretrained(TOKENIZER_NAME)
+model = DistilBertForQuestionAnswering.from_pretrained(MODEL_NAME)
+tokenizer = DistilBertTokenizerFast.from_pretrained(TOKENIZER_NAME)
 
 
 # Load data from the SQuAD dataset
