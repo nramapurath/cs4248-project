@@ -1,88 +1,87 @@
-from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
+import torch
+import json
 
 # Load the tokenizers and models
 bert_model_name = "google-bert/bert-large-uncased-whole-word-masking-finetuned-squad"
-bert_finetuned_model_name = "Ashaduzzaman/bert-finetuned-squad"
-roberta_model_name = "deepset/roberta-large-squad2"
+bert_finetuned_model_name = "distilbert/distilbert-base-cased-distilled-squad"
+roberta_model_name = "best_model"
+roberta_tokenizer_name = "best_tokenizer"
 
-# Load the tokenizers
-bert_tokenizer = AutoTokenizer.from_pretrained(bert_model_name)
-bert_finetuned_tokenizer = AutoTokenizer.from_pretrained(bert_finetuned_model_name)
-roberta_tokenizer = AutoTokenizer.from_pretrained(roberta_model_name)
+model_paths = [bert_model_name, bert_finetuned_model_name, roberta_model_name]
+tokenizer_paths = [bert_model_name, bert_finetuned_model_name, roberta_tokenizer_name]
 
-# Load the models
-bert_model = AutoModelForQuestionAnswering.from_pretrained(bert_model_name)
-bert_finetuned_model = AutoModelForQuestionAnswering.from_pretrained(bert_finetuned_model_name)
-roberta_model = AutoModelForQuestionAnswering.from_pretrained(roberta_model_name)
+models = [AutoModelForQuestionAnswering.from_pretrained(path) for path in model_paths]
+tokenizers = [AutoTokenizer.from_pretrained(path) for path in tokenizer_paths]
 
-from datasets import load_dataset
+# Prepare the pipeline for question answering for each model
+pipelines = [pipeline("question-answering", model=model, tokenizer=tokenizer, device=0) for model, tokenizer in zip(models, tokenizers)]
 
-# Load the SQuAD dataset
-dataset = load_dataset("squad")
+# Define a function to get top 3 answer spans with scores from each model
+def get_top_spans(pipeline, context, question, top_k=3):
+    results = pipeline({"question": question, "context": context}, top_k=top_k)
+    return [(result['answer'], result['score']) for result in results]
 
-# Preprocessing function
-def preprocess_function(examples, tokenizer):
-    # Tokenize the input
-    return tokenizer(examples["question"], examples["context"], truncation=True, padding=True, max_length=512)
+# Implement weighted averaging of confidence scores
+def weighted_answer_aggregation(context, question):
+    # Dictionary to store answers and their cumulative scores
+    answer_scores = {}
+    answer_counts = {}
 
-# Preprocess the dataset for each model's tokenizer
-bert_train = dataset["train"].map(lambda x: preprocess_function(x, bert_tokenizer), batched=True)
-bert_finetuned_train = dataset["train"].map(lambda x: preprocess_function(x, bert_finetuned_tokenizer), batched=True)
-roberta_train = dataset["train"].map(lambda x: preprocess_function(x, roberta_tokenizer), batched=True)
-
-import torch
-
-def get_predictions(model, tokenizer, dataset, batch_size=8):
-    model.eval()
-    predictions = []
-    for batch in torch.utils.data.DataLoader(dataset, batch_size=batch_size):
-        inputs = {key: val.to(model.device) for key, val in batch.items()}
-        with torch.no_grad():
-            outputs = model(**inputs)
+    # Get top 3 spans from each model
+    for pipe in pipelines:
+        top_spans = get_top_spans(pipe, context, question)
         
-        start_scores = outputs.start_logits
-        end_scores = outputs.end_logits
+        # Aggregate scores for each unique answer span
+        for answer, score in top_spans:
+            if answer in answer_scores:
+                answer_scores[answer] += score
+                answer_counts[answer] += 1  
+            else:
+                answer_scores[answer] = score   # Initialize score for a new answer
+                answer_counts[answer] = 1
+
+    # Compute average score for each answer
+    averaged_scores = {answer: answer_scores[answer] / answer_counts[answer] for answer in answer_scores}
+
+    # Select the answer with the highest averaged score
+    best_answer = max(averaged_scores, key=averaged_scores.get)
+    best_score = averaged_scores[best_answer]
+
+    return best_answer, best_score
+
+# Load JSON data
+def load_squad_data(file_path):
+    with open(file_path, "r") as file:
+        squad_data = json.load(file)["data"]
         
-        start_indexes = torch.argmax(start_scores, dim=-1)
-        end_indexes = torch.argmax(end_scores, dim=-1)
-        
-        # Convert token indices to text
-        for i in range(len(start_indexes)):
-            start_idx = start_indexes[i].item()
-            end_idx = end_indexes[i].item()
-            answer_tokens = batch['input_ids'][i][start_idx:end_idx+1]
-            answer = tokenizer.decode(answer_tokens, skip_special_tokens=True)
-            predictions.append(answer)
-    
-    return predictions
+    contexts = []
+    questions = []
+    question_ids = []
+    for group in squad_data:
+        for paragraph in group["paragraphs"]:
+            context = paragraph["context"]
+            for qa in paragraph["qas"]:
+                question = qa["question"]
+                qid = qa["id"]
+                contexts.append(context)
+                questions.append(question)
+                question_ids.append(qid)
+    return {"context": contexts, "question": questions, "id": question_ids}
+
+# Prepare the validation data
+val_data = load_squad_data("dev-v1.1.json")
+
+# Run the ensemble on each question in dev data
+predictions = {}
+for idx, (context, question, qid) in enumerate(zip(val_data["context"], val_data["question"], val_data["id"])):
+    best_answer, best_score = weighted_answer_aggregation(context=context, question=question)
+    predictions[qid] = best_answer
+
+    if idx % 50 == 0:
+        print(f"{idx} done")
 
 
-# Get predictions from each model
-bert_predictions = get_predictions(bert_model, bert_tokenizer, bert_train)
-bert_finetuned_predictions = get_predictions(bert_finetuned_model, bert_finetuned_tokenizer, bert_finetuned_train)
-roberta_predictions = get_predictions(roberta_model, roberta_tokenizer, roberta_train)
-
-from collections import Counter
-
-# Simple majority voting for answer selection
-def ensemble_predictions(*model_predictions):
-    final_predictions = []
-    for answers in zip(*model_predictions):
-        # Get the most common answer
-        common_answer = Counter(answers).most_common(1)[0][0]
-        final_predictions.append(common_answer)
-    return final_predictions
-
-# Get the final ensemble predictions
-ensemble_preds = ensemble_predictions(bert_predictions, bert_finetuned_predictions, roberta_predictions)
-
-from datasets import load_metric
-
-# Load the metric
-metric = load_metric("squad")
-
-# Evaluate the ensemble predictions
-results = metric.compute(predictions=ensemble_preds, references=dataset["validation"]["answers"])
-
-# Print the evaluation results
-print(results)
+# Save predictions to a JSON file in the required format
+with open("predictions_ensemble.json", "w") as outfile:
+    json.dump(predictions, outfile, indent=4)
