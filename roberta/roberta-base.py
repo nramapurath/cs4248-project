@@ -18,7 +18,7 @@ def load_squad_data(file_path):
         for paragraph in group["paragraphs"]:
             context = paragraph["context"]
             for qa in paragraph["qas"]:
-                question = qa["question"]
+                question = qa["question"].lstrip()
                 if qa["answers"]:
                     answer = qa["answers"][0]
                     contexts.append(context)
