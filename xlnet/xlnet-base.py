@@ -11,6 +11,8 @@ import torch
 import optuna
 import dotenv
 
+# You need a dotenv file with the following variables:
+# TOKENIZERS_PARALLELISM = true | false
 dotenv.load_dotenv()
 MODEL_NAME = "xlnet/xlnet-base-cased"
 TOKENIZER_NAME = "xlnet/xlnet-base-cased"
