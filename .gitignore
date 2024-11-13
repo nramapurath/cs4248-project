@@ -5,3 +5,8 @@ include/
 share/
 *.env*
 pyvenv.cfg
+albert/albert_model
+bert/bert_model
+distilbert/distilbert_model
+roberta/roberta_finetuned
+xlnet/xlnet_model
