@@ -10,17 +10,53 @@ import json
 import torch
 import optuna
 import dotenv
+from optuna.visualization.matplotlib import (
+    plot_optimization_history,
+    plot_intermediate_values,
+    plot_param_importances,
+)
+from matplotlib import pyplot as plt
+import os
 
 # You need a dotenv file with the following variables:
 # TOKENIZERS_PARALLELISM = true | false
 dotenv.load_dotenv()
-MODEL_NAME = "albert/albert-xxlarge-v2" # uncased by default
+MODEL_NAME = "albert/albert-xxlarge-v2"  # uncased by default
 TOKENIZER_NAME = "albert/albert-xxlarge-v2"
-TRAIN_DATASET_NAME = "train-v1.1.json"
-VAL_DATASET_NAME = "dev-v1.1.json"
+TRAIN_DATASET_NAME = "../data/train-v1.1.json"
+VAL_DATASET_NAME = "../data/dev-v1.1.json"
 OUTPUT_MODEL_NAME = "best_albert_model"
 OUTPUT_TOKENIZER_NAME = "best_albert_tokenizer"
 DEVICE = "mps"  # "cuda" if GPU available, "mps" if Mac, "cpu" otherwise
+
+
+def plot_files(study: optuna.Study):
+    dirname = "plots"
+    if not os.path.isdir(dirname):
+        os.makedirs(dirname)
+    filename_prefix = "albert_plot"
+
+    # Optimization history
+    opt_history_filename = f"{filename_prefix}_opt_history.png"
+    filepath_opt_history = os.path.join(dirname, opt_history_filename)
+    opt_hist_ax = plot_optimization_history(study)
+    plt.savefig(filepath_opt_history)
+
+    # Intermediate values
+    intermediate_values_filename = f"{filename_prefix}_intermediate_values.png"
+    filepath_intermediate_values = os.path.join(dirname, intermediate_values_filename)
+    intermediate_values_ax = plot_intermediate_values(study)
+    plt.savefig(filepath_intermediate_values)
+
+    # Hyperparameter importances
+    param_importances_filename = f"{filename_prefix}_param_importances.png"
+    filepath_param_importances = os.path.join(dirname, param_importances_filename)
+    param_importances_ax = plot_param_importances(
+        study,
+        target=lambda t: t.duration.total_seconds() if t.duration else 0,
+        target_name="duration",
+    )
+    plt.savefig(filepath_param_importances)
 
 
 # Load SQuAD data as JSON
@@ -110,7 +146,7 @@ if __name__ == "__main__":
     def model_training(trial: optuna.Trial):
         learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-5, log=True)
         batch_size = trial.suggest_categorical(
-            "batch_size", [2, 4]
+            "batch_size", [16, 32]
         )  # [16, 32] if larger RAM
         num_train_epochs = trial.suggest_int("num_train_epochs", 2, 4)
 
@@ -124,7 +160,7 @@ if __name__ == "__main__":
             weight_decay=0.01,
             save_total_limit=1,
             save_strategy="epoch",
-            dataloader_num_workers=4,
+            dataloader_num_workers=2,
             fp16=False,  # True if CUDA
             gradient_accumulation_steps=4,
             gradient_checkpointing=False,  # XLNet does not support gradient checkpointing
@@ -152,6 +188,8 @@ if __name__ == "__main__":
     # Run hyperparameter optimization
     study = optuna.create_study(direction="minimize")
     study.optimize(model_training, n_trials=3)
+
+    plot_files(study)
 
     # Best hyperparameters
     print("Best hyperparameters found:", study.best_params)

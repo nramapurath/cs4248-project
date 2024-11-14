@@ -1,7 +1,6 @@
 from transformers import (
-    XLNetTokenizerFast,
-    XLNetForQuestionAnsweringSimple,
-    PreTrainedModel,
+    BertTokenizerFast,
+    BertForQuestionAnswering,
     Trainer,
     TrainingArguments,
 )
@@ -9,7 +8,6 @@ from datasets import Dataset
 import json
 import torch
 import optuna
-import dotenv
 import os
 from optuna.visualization.matplotlib import (
     plot_optimization_history,
@@ -17,24 +15,16 @@ from optuna.visualization.matplotlib import (
     plot_param_importances,
 )
 from matplotlib import pyplot as plt
+import dotenv
 
-# You need a dotenv file with the following variables:
-# TOKENIZERS_PARALLELISM = true | false
 dotenv.load_dotenv()
-MODEL_NAME = "xlnet/xlnet-base-cased"
-TOKENIZER_NAME = "xlnet/xlnet-base-cased"
-TRAIN_DATASET_NAME = "../data/train-v1.1.json"
-VAL_DATASET_NAME = "../data/dev-v1.1.json"
-OUTPUT_MODEL_NAME = "best_xlnet_model"
-OUTPUT_TOKENIZER_NAME = "best_xlnet_tokenizer"
-DEVICE = "cuda"  # "cuda" if GPU available, "mps" if Mac, "cpu" otherwise
 
 
 def plot_files(study: optuna.Study):
     dirname = "plots"
     if not os.path.isdir(dirname):
         os.makedirs(dirname)
-    filename_prefix = "xlnet_plot"
+    filename_prefix = "bertfinetuned_plot"
 
     # Optimization history
     opt_history_filename = f"{filename_prefix}_opt_history.png"
@@ -59,7 +49,7 @@ def plot_files(study: optuna.Study):
     plt.savefig(filepath_param_importances)
 
 
-# Load SQuAD data as JSON
+# Load JSON data
 def load_squad_data(file_path):
     with open(file_path, "r") as file:
         squad_data = json.load(file)["data"]
@@ -73,10 +63,7 @@ def load_squad_data(file_path):
             for qa in paragraph["qas"]:
                 question = qa["question"]
                 if qa["answers"]:
-                    # TODO: Handle multiple answers
-                    answer = qa["answers"][
-                        0
-                    ]  # Only use the first answer for simplicity
+                    answer = qa["answers"][0]
                     contexts.append(context)
                     questions.append(question)
                     answers.append(answer)
@@ -84,28 +71,23 @@ def load_squad_data(file_path):
 
 
 if __name__ == "__main__":
-
-    device = torch.device(DEVICE)
-
     # Convert data to Hugging Face Dataset format
-    train_data = load_squad_data(TRAIN_DATASET_NAME)
-    val_data = load_squad_data(VAL_DATASET_NAME)
+    train_data = load_squad_data("../data/train-v1.1.json")
+    val_data = load_squad_data("../data/dev-v1.1.json")
     train_dataset = Dataset.from_dict(train_data)
     val_dataset = Dataset.from_dict(val_data)
 
     # Load BERT tokenizer and model
-    model_name = MODEL_NAME
-    tokenizer: XLNetTokenizerFast = XLNetTokenizerFast.from_pretrained(
-        model_name,
-    )  # Don't use AutoTokenizer to specify exact tokenizer
-    model: PreTrainedModel = XLNetForQuestionAnsweringSimple.from_pretrained(model_name)
+    model_name = "bert-base-uncased"
+    tokenizer = BertTokenizerFast.from_pretrained(model_name)
+    model = BertForQuestionAnswering.from_pretrained(model_name)
 
     # Preprocess data
     def preprocess(example):
         inputs = tokenizer(
             example["question"],
             example["context"],
-            max_length=512,  # Max BERT input length
+            max_length=384,
             truncation="only_second",
             padding="max_length",
             return_offsets_mapping=True,
@@ -143,16 +125,14 @@ if __name__ == "__main__":
     )
 
     # Hyperparameter tuning function using Optuna
-    def model_training(trial: optuna.Trial):
-        learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-5, log=True)
-        batch_size = trial.suggest_categorical(
-            "batch_size", [16, 32]
-        )  # [16, 32] if larger RAM
+    def model_training(trial):
+        learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 5e-5)
+        batch_size = trial.suggest_categorical("batch_size", [16, 32])
         num_train_epochs = trial.suggest_int("num_train_epochs", 2, 4)
 
         training_args = TrainingArguments(
             output_dir="./results",
-            eval_strategy="epoch",
+            evaluation_strategy="epoch",
             learning_rate=learning_rate,
             per_device_train_batch_size=batch_size,
             per_device_eval_batch_size=batch_size,
@@ -161,9 +141,9 @@ if __name__ == "__main__":
             save_total_limit=1,
             save_strategy="epoch",
             dataloader_num_workers=2,
-            fp16=False,  # True if CUDA
+            fp16=True,
             gradient_accumulation_steps=4,
-            gradient_checkpointing=False,  # XLNet does not support gradient checkpointing
+            gradient_checkpointing=True,
             remove_unused_columns=False,
         )
 
@@ -179,12 +159,6 @@ if __name__ == "__main__":
 
         return eval_results["eval_loss"]
 
-    # Clear MPS cache
-    if DEVICE == "mps":
-        torch.mps.empty_cache()
-    elif DEVICE == "cuda":
-        torch.cuda.empty_cache()
-
     # Run hyperparameter optimization
     study = optuna.create_study(direction="minimize")
     study.optimize(model_training, n_trials=3)
@@ -194,9 +168,9 @@ if __name__ == "__main__":
     plot_files(study)
 
     # Save the best model and tokenizer
-    model.save_pretrained(OUTPUT_MODEL_NAME)
-    tokenizer.save_pretrained(OUTPUT_TOKENIZER_NAME)
+    model.save_pretrained("best_model")
+    tokenizer.save_pretrained("best_tokenizer")
 
-    # # Load and apply the model later
-    # model = XLNetForQuestionAnswering.from_pretrained("best_xlnet_model")
-    # tokenizer = XLNetTokenizerFast.from_pretrained("best_xlnet_tokenizer")
+    # Load and apply the model later
+    model = BertForQuestionAnswering.from_pretrained("best_model")
+    tokenizer = BertTokenizerFast.from_pretrained("best_tokenizer")

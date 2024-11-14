@@ -18,9 +18,9 @@ Each directory contains the following files:
 | Base BERT | 110M | 86.02 | 77.48 |
 | RoBERTa | 125M | 86.59 | 78.54 |
 | XLNet | 110M | 78.98 | 69.12 |
-| ALBERT | **223M** | 87.77 | 77.96 |
+| ALBERT | **223M** | **87.77** | 77.96 |
 | DistilBERT | 66M | 82.98 | 74.11 |
-| **Ensembled (BERT and XLNet)** | - | **91.74** | **85.46** |
+| **Ensembled (All Models)** | - | 86.25 | **78.79** |
 
 
 ## Table of Contents

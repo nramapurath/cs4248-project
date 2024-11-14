@@ -8,7 +8,45 @@ from datasets import Dataset
 import json
 import torch
 import optuna
+from optuna.visualization.matplotlib import (
+    plot_optimization_history,
+    plot_intermediate_values,
+    plot_param_importances,
+)
+from matplotlib import pyplot as plt
 import os
+import dotenv
+
+dotenv.load_dotenv()
+
+
+def plot_files(study: optuna.Study):
+    dirname = "plots"
+    if not os.path.isdir(dirname):
+        os.makedirs(dirname)
+    filename_prefix = "roberta_plot"
+
+    # Optimization history
+    opt_history_filename = f"{filename_prefix}_opt_history.png"
+    filepath_opt_history = os.path.join(dirname, opt_history_filename)
+    opt_hist_ax = plot_optimization_history(study)
+    plt.savefig(filepath_opt_history)
+
+    # Intermediate values
+    intermediate_values_filename = f"{filename_prefix}_intermediate_values.png"
+    filepath_intermediate_values = os.path.join(dirname, intermediate_values_filename)
+    intermediate_values_ax = plot_intermediate_values(study)
+    plt.savefig(filepath_intermediate_values)
+
+    # Hyperparameter importances
+    param_importances_filename = f"{filename_prefix}_param_importances.png"
+    filepath_param_importances = os.path.join(dirname, param_importances_filename)
+    param_importances_ax = plot_param_importances(
+        study,
+        target=lambda t: t.duration.total_seconds() if t.duration else 0,
+        target_name="duration",
+    )
+    plt.savefig(filepath_param_importances)
 
 
 # Load JSON data
@@ -83,8 +121,8 @@ def model_training(trial):
         weight_decay=0.01,
         save_total_limit=1,
         save_strategy="epoch",
-        dataloader_num_workers=4,
-        fp16=False,  # disabled as it causes error on my machine, it was set to true originally.
+        dataloader_num_workers=2,
+        fp16=True,  # disabled as it causes error on my machine, it was set to true originally.
         gradient_accumulation_steps=4,
         gradient_checkpointing=True,
         remove_unused_columns=False,
@@ -104,8 +142,7 @@ def model_training(trial):
 
 
 if __name__ == "__main__":
-    os.environ["TOKENIZERS_PARALLELISM"] = "false"  # added to not cause deadlocks
-
+    torch.device("cuda")
     # Convert data to Hugging Face Dataset format
     train_data = load_squad_data("../data/train-v1.1.json")
     val_data = load_squad_data("../data/dev-v1.1.json")
@@ -129,8 +166,15 @@ if __name__ == "__main__":
     study = optuna.create_study(direction="minimize")
     study.optimize(model_training, n_trials=3)
 
+    op_history_plot = plot_optimization_history(study)
+    optuna.visualization.plot_param_importances(
+        study, target=lambda t: t.duration.total_seconds(), target_name="duration"
+    )
+
     # Best hyperparameters
     print("Best hyperparameters found:", study.best_params)
+    # Plot training graphs
+    plot_files(study)
 
     # Save the best model and tokenizer
     model.save_pretrained("best_roberta_model")
